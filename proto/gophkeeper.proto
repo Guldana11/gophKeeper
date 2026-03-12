@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package gophkeeper;
+
+option go_package = "github.com/guldana/gophKeeper/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// GophKeeper — основной сервис для управления секретными данными пользователя.
+service GophKeeper {
+  // Register создаёт нового пользователя.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // Login аутентифицирует пользователя и возвращает JWT токен.
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // CreateItem сохраняет новый элемент данных.
+  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
+  // GetItem возвращает элемент данных по идентификатору.
+  rpc GetItem(GetItemRequest) returns (GetItemResponse);
+  // ListItems возвращает все элементы данных пользователя.
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+  // UpdateItem обновляет существующий элемент данных.
+  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
+  // DeleteItem удаляет элемент данных по идентификатору.
+  rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
+
+  // SyncItems синхронизирует данные между клиентом и сервером.
+  rpc SyncItems(SyncRequest) returns (SyncResponse);
+}
+
+// DataType — тип хранимых данных.
+enum DataType {
+  DATA_TYPE_UNSPECIFIED = 0;
+  DATA_TYPE_CREDENTIAL = 1;
+  DATA_TYPE_TEXT = 2;
+  DATA_TYPE_BINARY = 3;
+  DATA_TYPE_BANK_CARD = 4;
+}
+
+// Item — единица хранения данных.
+message Item {
+  string id = 1;
+  DataType data_type = 2;
+  bytes encrypted_data = 3;
+  map<string, string> metadata = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// Auth messages
+
+message RegisterRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string token = 1;
+}
+
+message LoginRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string token = 1;
+}
+
+// CRUD messages
+
+message CreateItemRequest {
+  Item item = 1;
+}
+
+message CreateItemResponse {
+  string id = 1;
+}
+
+message GetItemRequest {
+  string id = 1;
+}
+
+message GetItemResponse {
+  Item item = 1;
+}
+
+message ListItemsRequest {}
+
+message ListItemsResponse {
+  repeated Item items = 1;
+}
+
+message UpdateItemRequest {
+  Item item = 1;
+}
+
+message UpdateItemResponse {}
+
+message DeleteItemRequest {
+  string id = 1;
+}
+
+message DeleteItemResponse {}
+
+// Sync messages
+
+message SyncRequest {
+  repeated Item items = 1;
+  google.protobuf.Timestamp last_sync_time = 2;
+}
+
+message SyncResponse {
+  repeated Item updated_items = 1;
+  repeated string deleted_ids = 2;
+}
