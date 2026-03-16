@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	pb "github.com/guldana/gophKeeper/proto"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 // Client предоставляет методы для взаимодействия с сервером GophKeeper.

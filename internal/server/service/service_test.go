@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guldana/gophKeeper/internal/models"
-	"github.com/guldana/gophKeeper/internal/server/storage"
+	"github.com/guldana/gophKeeperr/internal/models"
+	"github.com/guldana/gophKeeperr/internal/server/storage"
 )
 
 // --- Моки ---

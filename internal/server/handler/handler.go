@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/guldana/gophKeeper/internal/models"
-	"github.com/guldana/gophKeeper/internal/server/service"
-	"github.com/guldana/gophKeeper/internal/server/storage"
-	pb "github.com/guldana/gophKeeper/proto"
+	"github.com/guldana/gophKeeperr/internal/models"
+	"github.com/guldana/gophKeeperr/internal/server/service"
+	"github.com/guldana/gophKeeperr/internal/server/storage"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 // ServiceProvider определяет интерфейс бизнес-логики для хендлера.

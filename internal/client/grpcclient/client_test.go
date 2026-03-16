@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/guldana/gophKeeper/proto"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 // fakeServer реализует минимальный gRPC сервер для тестирования клиента.

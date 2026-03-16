@@ -12,7 +12,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/guldana/gophKeeper/internal/models"
+	"github.com/guldana/gophKeeperr/internal/models"
 )
 
 // Ошибки хранилища.

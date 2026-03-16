@@ -1,4 +1,4 @@
-module github.com/guldana/gophKeeper
+module github.com/guldana/gophKeeperr
 
 go 1.25.2
 

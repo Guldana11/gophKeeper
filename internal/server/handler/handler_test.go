@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/guldana/gophKeeper/internal/models"
-	"github.com/guldana/gophKeeper/internal/server/service"
-	"github.com/guldana/gophKeeper/internal/server/storage"
-	pb "github.com/guldana/gophKeeper/proto"
+	"github.com/guldana/gophKeeperr/internal/models"
+	"github.com/guldana/gophKeeperr/internal/server/service"
+	"github.com/guldana/gophKeeperr/internal/server/storage"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 // --- Мок сервиса ---

@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/guldana/gophKeeper/internal/server/auth"
+	"github.com/guldana/gophKeeperr/internal/server/auth"
 )
 
 type contextKey string

@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/guldana/gophKeeper/internal/client/config"
-	"github.com/guldana/gophKeeper/internal/client/grpcclient"
-	pb "github.com/guldana/gophKeeper/proto"
+	"github.com/guldana/gophKeeperr/internal/client/config"
+	"github.com/guldana/gophKeeperr/internal/client/grpcclient"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 var (
