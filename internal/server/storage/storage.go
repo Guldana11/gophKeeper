@@ -57,12 +57,20 @@ func (s *Storage) Close() {
 }
 
 func (s *Storage) migrate() error {
-	data, err := os.ReadFile("migrations/001_init.sql")
-	if err != nil {
-		return fmt.Errorf("ошибка чтения миграции: %w", err)
+	migrations := []string{
+		"migrations/001_init.sql",
+		"migrations/002_deleted_items.sql",
 	}
-	_, err = s.pool.Exec(context.Background(), string(data))
-	return err
+	for _, path := range migrations {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("ошибка чтения миграции %s: %w", path, err)
+		}
+		if _, err := s.pool.Exec(context.Background(), string(data)); err != nil {
+			return fmt.Errorf("ошибка выполнения миграции %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 // CreateUser создаёт нового пользователя. Возвращает ErrUserExists, если логин занят.
@@ -232,9 +240,9 @@ func (s *Storage) UpdateItem(ctx context.Context, item *models.Item) error {
 	return nil
 }
 
-// DeleteItem удаляет элемент данных.
+// DeleteItem удаляет элемент данных и записывает его ID в таблицу удалённых для синхронизации.
 func (s *Storage) DeleteItem(ctx context.Context, id, userID string) error {
-	query, args, err := psql.
+	delQuery, delArgs, err := psql.
 		Delete("items").
 		Where(sq.Eq{"id": id, "user_id": userID}).
 		ToSql()
@@ -242,7 +250,7 @@ func (s *Storage) DeleteItem(ctx context.Context, id, userID string) error {
 		return fmt.Errorf("ошибка построения запроса: %w", err)
 	}
 
-	ct, err := s.pool.Exec(ctx, query, args...)
+	ct, err := s.pool.Exec(ctx, delQuery, delArgs...)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления элемента: %w", err)
 	}
@@ -250,6 +258,20 @@ func (s *Storage) DeleteItem(ctx context.Context, id, userID string) error {
 	if ct.RowsAffected() == 0 {
 		return ErrItemNotFound
 	}
+
+	insQuery, insArgs, err := psql.
+		Insert("deleted_items").
+		Columns("id", "user_id").
+		Values(id, userID).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	if _, err := s.pool.Exec(ctx, insQuery, insArgs...); err != nil {
+		return fmt.Errorf("ошибка записи удалённого элемента: %w", err)
+	}
+
 	return nil
 }
 
@@ -285,4 +307,33 @@ func (s *Storage) GetItemsUpdatedAfter(ctx context.Context, userID string, after
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// GetDeletedIDsAfter возвращает ID элементов, удалённых после указанного времени.
+func (s *Storage) GetDeletedIDsAfter(ctx context.Context, userID string, after time.Time) ([]string, error) {
+	query, args, err := psql.
+		Select("id").
+		From("deleted_items").
+		Where(sq.Eq{"user_id": userID}).
+		Where(sq.Gt{"deleted_at": after}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения удалённых элементов: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("ошибка чтения ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
