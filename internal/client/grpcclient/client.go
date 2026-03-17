@@ -3,9 +3,13 @@ package grpcclient
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"os"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
@@ -20,8 +24,20 @@ type Client struct {
 }
 
 // New создаёт новый gRPC клиент и подключается к серверу.
-func New(addr string) (*Client, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// Если caCertPath не пустой, используется TLS с указанным CA-сертификатом.
+func New(addr string, caCertPath string) (*Client, error) {
+	var creds grpc.DialOption
+	if caCertPath != "" {
+		tlsCreds, err := loadTLSCredentials(caCertPath)
+		if err != nil {
+			return nil, err
+		}
+		creds = grpc.WithTransportCredentials(tlsCreds)
+	} else {
+		creds = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	conn, err := grpc.NewClient(addr, creds)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка подключения к серверу: %w", err)
 	}
@@ -30,6 +46,24 @@ func New(addr string) (*Client, error) {
 		conn:    conn,
 		service: pb.NewGophKeeperClient(conn),
 	}, nil
+}
+
+func loadTLSCredentials(caCertPath string) (credentials.TransportCredentials, error) {
+	caCert, err := os.ReadFile(caCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка чтения CA сертификата: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("не удалось добавить CA сертификат")
+	}
+
+	tlsCfg := &tls.Config{
+		RootCAs:    certPool,
+		MinVersion: tls.VersionTLS12,
+	}
+	return credentials.NewTLS(tlsCfg), nil
 }
 
 // Close закрывает соединение с сервером.

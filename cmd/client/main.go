@@ -86,7 +86,7 @@ func cmdRegister(addr string, cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := grpcclient.New(addr)
+	client, err := grpcclient.New(addr, cfg.CACertPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
@@ -124,7 +124,7 @@ func cmdLogin(addr string, cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := grpcclient.New(addr)
+	client, err := grpcclient.New(addr, cfg.CACertPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
@@ -157,7 +157,7 @@ func cmdList(addr string, cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := grpcclient.New(addr)
+	client, err := grpcclient.New(addr, cfg.CACertPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
@@ -246,7 +246,7 @@ func cmdAdd(addr string, cfg *config.Config) {
 		meta["label"] = *label
 	}
 
-	client, err := grpcclient.New(addr)
+	client, err := grpcclient.New(addr, cfg.CACertPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
@@ -285,7 +285,7 @@ func cmdDelete(addr string, cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := grpcclient.New(addr)
+	client, err := grpcclient.New(addr, cfg.CACertPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)

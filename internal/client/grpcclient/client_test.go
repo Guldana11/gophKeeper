@@ -73,7 +73,7 @@ func startFakeServer(t *testing.T) string {
 
 func TestRegister(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestRegister(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestLogin(t *testing.T) {
 
 func TestLoginFail(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestLoginFail(t *testing.T) {
 
 func TestListItems(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestListItems(t *testing.T) {
 
 func TestCreateItem(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestCreateItem(t *testing.T) {
 
 func TestDeleteItem(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
