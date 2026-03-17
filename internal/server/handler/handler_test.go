@@ -25,7 +25,7 @@ type mockService struct {
 	listItemsFunc  func(ctx context.Context, userID string) ([]*models.Item, error)
 	updateItemFunc func(ctx context.Context, item *models.Item) error
 	deleteItemFunc func(ctx context.Context, id, userID string) error
-	syncFunc       func(ctx context.Context, userID string, items []*models.Item, lastSync time.Time) ([]*models.Item, error)
+	syncFunc       func(ctx context.Context, userID string, items []*models.Item, lastSync time.Time) ([]*models.Item, []string, error)
 }
 
 func (m *mockService) Register(ctx context.Context, login, password string) (string, error) {
@@ -49,7 +49,7 @@ func (m *mockService) UpdateItem(ctx context.Context, item *models.Item) error {
 func (m *mockService) DeleteItem(ctx context.Context, id, userID string) error {
 	return m.deleteItemFunc(ctx, id, userID)
 }
-func (m *mockService) Sync(ctx context.Context, userID string, items []*models.Item, lastSync time.Time) ([]*models.Item, error) {
+func (m *mockService) Sync(ctx context.Context, userID string, items []*models.Item, lastSync time.Time) ([]*models.Item, []string, error) {
 	return m.syncFunc(ctx, userID, items, lastSync)
 }
 

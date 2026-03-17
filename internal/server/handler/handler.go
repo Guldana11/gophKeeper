@@ -24,7 +24,7 @@ type ServiceProvider interface {
 	ListItems(ctx context.Context, userID string) ([]*models.Item, error)
 	UpdateItem(ctx context.Context, item *models.Item) error
 	DeleteItem(ctx context.Context, id, userID string) error
-	Sync(ctx context.Context, userID string, clientItems []*models.Item, lastSync time.Time) ([]*models.Item, error)
+	Sync(ctx context.Context, userID string, clientItems []*models.Item, lastSync time.Time) ([]*models.Item, []string, error)
 }
 
 // GophKeeperHandler реализует gRPC сервис GophKeeper.
@@ -161,7 +161,7 @@ func (h *GophKeeperHandler) SyncItems(ctx context.Context, req *pb.SyncRequest) 
 
 	lastSync := req.LastSyncTime.AsTime()
 
-	updated, err := h.service.Sync(ctx, userID, clientItems, lastSync)
+	updated, deletedIDs, err := h.service.Sync(ctx, userID, clientItems, lastSync)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "ошибка синхронизации")
 	}
@@ -171,7 +171,7 @@ func (h *GophKeeperHandler) SyncItems(ctx context.Context, req *pb.SyncRequest) 
 		pbItems[i] = itemToProto(item)
 	}
 
-	return &pb.SyncResponse{UpdatedItems: pbItems}, nil
+	return &pb.SyncResponse{UpdatedItems: pbItems, DeletedIds: deletedIDs}, nil
 }
 
 func itemToProto(item *models.Item) *pb.Item {

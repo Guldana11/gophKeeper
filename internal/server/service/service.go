@@ -27,6 +27,7 @@ type StorageProvider interface {
 	UpdateItem(ctx context.Context, item *models.Item) error
 	DeleteItem(ctx context.Context, id, userID string) error
 	GetItemsUpdatedAfter(ctx context.Context, userID string, after time.Time) ([]*models.Item, error)
+	GetDeletedIDsAfter(ctx context.Context, userID string, after time.Time) ([]string, error)
 }
 
 // AuthProvider определяет интерфейс для аутентификации.
@@ -120,33 +121,38 @@ func (s *Service) DeleteItem(ctx context.Context, id, userID string) error {
 	return s.storage.DeleteItem(ctx, id, userID)
 }
 
-// Sync синхронизирует данные: принимает изменения от клиента, возвращает серверные обновления.
-func (s *Service) Sync(ctx context.Context, userID string, clientItems []*models.Item, lastSync time.Time) ([]*models.Item, error) {
+// Sync синхронизирует данные: принимает изменения от клиента, возвращает серверные обновления и ID удалённых элементов.
+func (s *Service) Sync(ctx context.Context, userID string, clientItems []*models.Item, lastSync time.Time) ([]*models.Item, []string, error) {
 	for _, item := range clientItems {
 		item.UserID = userID
 		existing, err := s.storage.GetItem(ctx, item.ID, userID)
 		if err != nil {
 			if errors.Is(err, storage.ErrItemNotFound) {
 				if _, err := s.storage.CreateItem(ctx, item); err != nil {
-					return nil, fmt.Errorf("ошибка создания элемента при синхронизации: %w", err)
+					return nil, nil, fmt.Errorf("ошибка создания элемента при синхронизации: %w", err)
 				}
 				continue
 			}
-			return nil, fmt.Errorf("ошибка получения элемента при синхронизации: %w", err)
+			return nil, nil, fmt.Errorf("ошибка получения элемента при синхронизации: %w", err)
 		}
 
 		// Last-write-wins: обновляем если клиентская версия новее
 		if item.UpdatedAt.After(existing.UpdatedAt) {
 			if err := s.storage.UpdateItem(ctx, item); err != nil {
-				return nil, fmt.Errorf("ошибка обновления элемента при синхронизации: %w", err)
+				return nil, nil, fmt.Errorf("ошибка обновления элемента при синхронизации: %w", err)
 			}
 		}
 	}
 
 	updated, err := s.storage.GetItemsUpdatedAfter(ctx, userID, lastSync)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения обновлённых элементов: %w", err)
+		return nil, nil, fmt.Errorf("ошибка получения обновлённых элементов: %w", err)
 	}
 
-	return updated, nil
+	deletedIDs, err := s.storage.GetDeletedIDsAfter(ctx, userID, lastSync)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ошибка получения удалённых элементов: %w", err)
+	}
+
+	return updated, deletedIDs, nil
 }

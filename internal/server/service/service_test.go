@@ -13,14 +13,16 @@ import (
 // --- Моки ---
 
 type mockStorage struct {
-	users map[string]*models.User
-	items map[string]*models.Item
+	users      map[string]*models.User
+	items      map[string]*models.Item
+	deletedIDs map[string]time.Time // id -> deleted_at
 }
 
 func newMockStorage() *mockStorage {
 	return &mockStorage{
-		users: make(map[string]*models.User),
-		items: make(map[string]*models.Item),
+		users:      make(map[string]*models.User),
+		items:      make(map[string]*models.Item),
+		deletedIDs: make(map[string]time.Time),
 	}
 }
 
@@ -88,6 +90,7 @@ func (m *mockStorage) DeleteItem(_ context.Context, id, userID string) error {
 		return storage.ErrItemNotFound
 	}
 	delete(m.items, id)
+	m.deletedIDs[id] = time.Now()
 	return nil
 }
 
@@ -99,6 +102,16 @@ func (m *mockStorage) GetItemsUpdatedAfter(_ context.Context, userID string, aft
 		}
 	}
 	return result, nil
+}
+
+func (m *mockStorage) GetDeletedIDsAfter(_ context.Context, _ string, after time.Time) ([]string, error) {
+	var ids []string
+	for id, deletedAt := range m.deletedIDs {
+		if deletedAt.After(after) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
 }
 
 type mockAuth struct{}
@@ -304,7 +317,7 @@ func TestSync_NewItem(t *testing.T) {
 		},
 	}
 
-	updated, err := svc.Sync(context.Background(), "user-1", clientItems, time.Time{})
+	updated, _, err := svc.Sync(context.Background(), "user-1", clientItems, time.Time{})
 	if err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
@@ -337,7 +350,7 @@ func TestSync_LastWriteWins(t *testing.T) {
 		},
 	}
 
-	_, err := svc.Sync(context.Background(), "user-1", clientItems, time.Time{})
+	_, _, err := svc.Sync(context.Background(), "user-1", clientItems, time.Time{})
 	if err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
@@ -346,5 +359,24 @@ func TestSync_LastWriteWins(t *testing.T) {
 	item := store.items["item-1"]
 	if string(item.EncryptedData) != "client-data" {
 		t.Errorf("Sync() item data = %s, want client-data", item.EncryptedData)
+	}
+}
+
+func TestSync_DeletedIDs(t *testing.T) {
+	store := newMockStorage()
+	svc := New(store, &mockAuth{})
+
+	// Создаём и удаляем элемент
+	item := &models.Item{UserID: "user-1", DataType: models.DataTypeText, EncryptedData: []byte("data")}
+	created, _ := svc.CreateItem(context.Background(), item)
+	_ = svc.DeleteItem(context.Background(), created.ID, "user-1")
+
+	// Sync должен вернуть ID удалённого элемента
+	_, deletedIDs, err := svc.Sync(context.Background(), "user-1", nil, time.Time{})
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(deletedIDs) != 1 {
+		t.Errorf("Sync() deletedIDs count = %d, want 1", len(deletedIDs))
 	}
 }
