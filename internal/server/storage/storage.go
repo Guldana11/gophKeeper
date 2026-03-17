@@ -9,12 +9,16 @@ import (
 	"os"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/guldana/gophKeeperr/internal/models"
 )
+
+// psql — билдер запросов с плейсхолдерами PostgreSQL ($1, $2, ...).
+var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 // Ошибки хранилища.
 var (
@@ -63,13 +67,19 @@ func (s *Storage) migrate() error {
 
 // CreateUser создаёт нового пользователя. Возвращает ErrUserExists, если логин занят.
 func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*models.User, error) {
-	user := &models.User{}
-	err := s.pool.QueryRow(ctx,
-		`INSERT INTO users (login, password_hash) VALUES ($1, $2)
-		 RETURNING id, login, password_hash, created_at`,
-		login, passwordHash,
-	).Scan(&user.ID, &user.Login, &user.PasswordHash, &user.CreatedAt)
+	query, args, err := psql.
+		Insert("users").
+		Columns("login", "password_hash").
+		Values(login, passwordHash).
+		Suffix("RETURNING id, login, password_hash, created_at").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
 
+	user := &models.User{}
+	err = s.pool.QueryRow(ctx, query, args...).
+		Scan(&user.ID, &user.Login, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -82,12 +92,18 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*
 
 // GetUserByLogin возвращает пользователя по логину.
 func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*models.User, error) {
-	user := &models.User{}
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, login, password_hash, created_at FROM users WHERE login = $1`,
-		login,
-	).Scan(&user.ID, &user.Login, &user.PasswordHash, &user.CreatedAt)
+	query, args, err := psql.
+		Select("id", "login", "password_hash", "created_at").
+		From("users").
+		Where(sq.Eq{"login": login}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
 
+	user := &models.User{}
+	err = s.pool.QueryRow(ctx, query, args...).
+		Scan(&user.ID, &user.Login, &user.PasswordHash, &user.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -104,30 +120,42 @@ func (s *Storage) CreateItem(ctx context.Context, item *models.Item) (*models.It
 		return nil, fmt.Errorf("ошибка сериализации метаданных: %w", err)
 	}
 
-	err = s.pool.QueryRow(ctx,
-		`INSERT INTO items (user_id, data_type, encrypted_data, metadata)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, created_at, updated_at`,
-		item.UserID, item.DataType, item.EncryptedData, meta,
-	).Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt)
+	query, args, err := psql.
+		Insert("items").
+		Columns("user_id", "data_type", "encrypted_data", "metadata").
+		Values(item.UserID, item.DataType, item.EncryptedData, meta).
+		Suffix("RETURNING id, created_at, updated_at").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
 
+	err = s.pool.QueryRow(ctx, query, args...).
+		Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка создания элемента: %w", err)
 	}
 	return item, nil
 }
 
+// itemColumns — список колонок таблицы items для SELECT-запросов.
+var itemColumns = []string{"id", "user_id", "data_type", "encrypted_data", "metadata", "created_at", "updated_at"}
+
 // GetItem возвращает элемент данных по ID и userID.
 func (s *Storage) GetItem(ctx context.Context, id, userID string) (*models.Item, error) {
+	query, args, err := psql.
+		Select(itemColumns...).
+		From("items").
+		Where(sq.Eq{"id": id, "user_id": userID}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
 	item := &models.Item{}
 	var meta []byte
-
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, user_id, data_type, encrypted_data, metadata, created_at, updated_at
-		 FROM items WHERE id = $1 AND user_id = $2`,
-		id, userID,
-	).Scan(&item.ID, &item.UserID, &item.DataType, &item.EncryptedData, &meta, &item.CreatedAt, &item.UpdatedAt)
-
+	err = s.pool.QueryRow(ctx, query, args...).
+		Scan(&item.ID, &item.UserID, &item.DataType, &item.EncryptedData, &meta, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrItemNotFound
 	}
@@ -143,11 +171,17 @@ func (s *Storage) GetItem(ctx context.Context, id, userID string) (*models.Item,
 
 // ListItems возвращает все элементы данных пользователя.
 func (s *Storage) ListItems(ctx context.Context, userID string) ([]*models.Item, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT id, user_id, data_type, encrypted_data, metadata, created_at, updated_at
-		 FROM items WHERE user_id = $1 ORDER BY updated_at DESC`,
-		userID,
-	)
+	query, args, err := psql.
+		Select(itemColumns...).
+		From("items").
+		Where(sq.Eq{"user_id": userID}).
+		OrderBy("updated_at DESC").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения списка элементов: %w", err)
 	}
@@ -175,11 +209,19 @@ func (s *Storage) UpdateItem(ctx context.Context, item *models.Item) error {
 		return fmt.Errorf("ошибка сериализации метаданных: %w", err)
 	}
 
-	ct, err := s.pool.Exec(ctx,
-		`UPDATE items SET data_type = $1, encrypted_data = $2, metadata = $3, updated_at = NOW()
-		 WHERE id = $4 AND user_id = $5`,
-		item.DataType, item.EncryptedData, meta, item.ID, item.UserID,
-	)
+	query, args, err := psql.
+		Update("items").
+		Set("data_type", item.DataType).
+		Set("encrypted_data", item.EncryptedData).
+		Set("metadata", meta).
+		Set("updated_at", sq.Expr("NOW()")).
+		Where(sq.Eq{"id": item.ID, "user_id": item.UserID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	ct, err := s.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("ошибка обновления элемента: %w", err)
 	}
@@ -192,10 +234,15 @@ func (s *Storage) UpdateItem(ctx context.Context, item *models.Item) error {
 
 // DeleteItem удаляет элемент данных.
 func (s *Storage) DeleteItem(ctx context.Context, id, userID string) error {
-	ct, err := s.pool.Exec(ctx,
-		`DELETE FROM items WHERE id = $1 AND user_id = $2`,
-		id, userID,
-	)
+	query, args, err := psql.
+		Delete("items").
+		Where(sq.Eq{"id": id, "user_id": userID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	ct, err := s.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления элемента: %w", err)
 	}
@@ -208,11 +255,18 @@ func (s *Storage) DeleteItem(ctx context.Context, id, userID string) error {
 
 // GetItemsUpdatedAfter возвращает элементы, обновлённые после указанного времени.
 func (s *Storage) GetItemsUpdatedAfter(ctx context.Context, userID string, after time.Time) ([]*models.Item, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT id, user_id, data_type, encrypted_data, metadata, created_at, updated_at
-		 FROM items WHERE user_id = $1 AND updated_at > $2 ORDER BY updated_at DESC`,
-		userID, after,
-	)
+	query, args, err := psql.
+		Select(itemColumns...).
+		From("items").
+		Where(sq.Eq{"user_id": userID}).
+		Where(sq.Gt{"updated_at": after}).
+		OrderBy("updated_at DESC").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("ошибка построения запроса: %w", err)
+	}
+
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения обновлённых элементов: %w", err)
 	}
