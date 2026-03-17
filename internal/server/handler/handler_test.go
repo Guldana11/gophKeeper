@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/guldana/gophKeeperr/internal/models"
 	"github.com/guldana/gophKeeperr/internal/server/service"
@@ -270,6 +271,45 @@ func TestHandler_DeleteItem_NotFound(t *testing.T) {
 	_, err := h.DeleteItem(ctx, &pb.DeleteItemRequest{Id: "nonexistent"})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("DeleteItem() code = %v, want NotFound", status.Code(err))
+	}
+}
+
+func TestHandler_SyncItems_Success(t *testing.T) {
+	h := NewGophKeeperHandler(&mockService{
+		syncFunc: func(_ context.Context, _ string, _ []*models.Item, _ time.Time) ([]*models.Item, []string, error) {
+			return []*models.Item{
+				{ID: "item-1", DataType: models.DataTypeText, EncryptedData: []byte("data"), Metadata: map[string]string{}},
+			}, []string{"deleted-1", "deleted-2"}, nil
+		},
+	})
+
+	ctx := ctxWithUserID("user-1")
+	resp, err := h.SyncItems(ctx, &pb.SyncRequest{
+		Items:        []*pb.Item{{Id: "item-1", EncryptedData: []byte("data")}},
+		LastSyncTime: timestamppb.Now(),
+	})
+	if err != nil {
+		t.Fatalf("SyncItems() error = %v", err)
+	}
+	if len(resp.UpdatedItems) != 1 {
+		t.Errorf("SyncItems() updated count = %d, want 1", len(resp.UpdatedItems))
+	}
+	if len(resp.DeletedIds) != 2 {
+		t.Errorf("SyncItems() deleted count = %d, want 2", len(resp.DeletedIds))
+	}
+}
+
+func TestHandler_SyncItems_Error(t *testing.T) {
+	h := NewGophKeeperHandler(&mockService{
+		syncFunc: func(_ context.Context, _ string, _ []*models.Item, _ time.Time) ([]*models.Item, []string, error) {
+			return nil, nil, errors.New("sync failed")
+		},
+	})
+
+	ctx := ctxWithUserID("user-1")
+	_, err := h.SyncItems(ctx, &pb.SyncRequest{LastSyncTime: timestamppb.Now()})
+	if status.Code(err) != codes.Internal {
+		t.Errorf("SyncItems() code = %v, want Internal", status.Code(err))
 	}
 }
 
