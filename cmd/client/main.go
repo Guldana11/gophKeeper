@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/guldana/gophKeeperr/internal/client/config"
+	"github.com/guldana/gophKeeperr/internal/client/crypto"
 	"github.com/guldana/gophKeeperr/internal/client/grpcclient"
 	pb "github.com/guldana/gophKeeperr/proto"
 )
@@ -103,6 +104,7 @@ func cmdRegister(addr string, cfg *config.Config) {
 
 	cfg.Token = token
 	cfg.ServerAddr = addr
+	cfg.EncryptionKey = *password
 	if err := cfg.Save(); err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка сохранения токена: %v\n", err)
 		os.Exit(1)
@@ -140,6 +142,7 @@ func cmdLogin(addr string, cfg *config.Config) {
 
 	cfg.Token = token
 	cfg.ServerAddr = addr
+	cfg.EncryptionKey = *password
 	if err := cfg.Save(); err != nil {
 		fmt.Fprintf(os.Stderr, "Ошибка сохранения токена: %v\n", err)
 		os.Exit(1)
@@ -227,6 +230,17 @@ func cmdAdd(addr string, cfg *config.Config) {
 		os.Exit(1)
 	}
 
+	if cfg.EncryptionKey == "" {
+		fmt.Fprintln(os.Stderr, "Ключ шифрования не найден. Выполните login или register.")
+		os.Exit(1)
+	}
+
+	encryptedData, err := crypto.Encrypt([]byte(*data), cfg.EncryptionKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Ошибка шифрования: %v\n", err)
+		os.Exit(1)
+	}
+
 	meta := map[string]string{}
 	if *label != "" {
 		meta["label"] = *label
@@ -245,7 +259,7 @@ func cmdAdd(addr string, cfg *config.Config) {
 
 	id, err := client.CreateItem(ctx, &pb.Item{
 		DataType:      pbType,
-		EncryptedData: []byte(*data),
+		EncryptedData: encryptedData,
 		Metadata:      meta,
 	})
 	if err != nil {
