@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/guldana/gophKeeperr/proto"
 )
@@ -128,6 +129,24 @@ func (c *Client) CreateItem(ctx context.Context, item *pb.Item) (string, error) 
 	return resp.Id, nil
 }
 
+// GetItem возвращает элемент данных по ID.
+func (c *Client) GetItem(ctx context.Context, id string) (*pb.Item, error) {
+	resp, err := c.service.GetItem(c.authCtx(ctx), &pb.GetItemRequest{Id: id})
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения элемента: %w", err)
+	}
+	return resp.Item, nil
+}
+
+// UpdateItem обновляет существующий элемент данных.
+func (c *Client) UpdateItem(ctx context.Context, item *pb.Item) error {
+	_, err := c.service.UpdateItem(c.authCtx(ctx), &pb.UpdateItemRequest{Item: item})
+	if err != nil {
+		return fmt.Errorf("ошибка обновления элемента: %w", err)
+	}
+	return nil
+}
+
 // DeleteItem удаляет элемент данных по ID.
 func (c *Client) DeleteItem(ctx context.Context, id string) error {
 	_, err := c.service.DeleteItem(c.authCtx(ctx), &pb.DeleteItemRequest{Id: id})
@@ -135,4 +154,16 @@ func (c *Client) DeleteItem(ctx context.Context, id string) error {
 		return fmt.Errorf("ошибка удаления элемента: %w", err)
 	}
 	return nil
+}
+
+// SyncItems синхронизирует данные между клиентом и сервером.
+func (c *Client) SyncItems(ctx context.Context, items []*pb.Item, lastSyncTime *timestamppb.Timestamp) (*pb.SyncResponse, error) {
+	resp, err := c.service.SyncItems(c.authCtx(ctx), &pb.SyncRequest{
+		Items:        items,
+		LastSyncTime: lastSyncTime,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ошибка синхронизации: %w", err)
+	}
+	return resp, nil
 }
