@@ -945,7 +945,7 @@ const file_proto_gophkeeper_proto_rawDesc = "" +
 	"UpdateItem\x12\x1d.gophkeeper.UpdateItemRequest\x1a\x1e.gophkeeper.UpdateItemResponse\x12K\n" +
 	"\n" +
 	"DeleteItem\x12\x1d.gophkeeper.DeleteItemRequest\x1a\x1e.gophkeeper.DeleteItemResponse\x12>\n" +
-	"\tSyncItems\x12\x17.gophkeeper.SyncRequest\x1a\x18.gophkeeper.SyncResponseB%Z#github.com/guldana/gophKeeper/protob\x06proto3"
+	"\tSyncItems\x12\x17.gophkeeper.SyncRequest\x1a\x18.gophkeeper.SyncResponseB%Z#github.com/guldana/gophKeeperr/protob\x06proto3"
 
 var (
 	file_proto_gophkeeper_proto_rawDescOnce sync.Once

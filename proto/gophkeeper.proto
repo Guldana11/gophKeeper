@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package gophkeeper;
 
-option go_package = "github.com/guldana/gophKeeper/proto";
+option go_package = "github.com/guldana/gophKeeperr/proto";
 
 import "google/protobuf/timestamp.proto";
 

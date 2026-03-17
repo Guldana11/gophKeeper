@@ -9,11 +9,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/guldana/gophKeeper/internal/server/auth"
-	"github.com/guldana/gophKeeper/internal/server/handler"
-	"github.com/guldana/gophKeeper/internal/server/service"
-	"github.com/guldana/gophKeeper/internal/server/storage"
-	pb "github.com/guldana/gophKeeper/proto"
+	"github.com/guldana/gophKeeperr/internal/server/auth"
+	"github.com/guldana/gophKeeperr/internal/server/handler"
+	"github.com/guldana/gophKeeperr/internal/server/service"
+	"github.com/guldana/gophKeeperr/internal/server/storage"
+	pb "github.com/guldana/gophKeeperr/proto"
 )
 
 func main() {
