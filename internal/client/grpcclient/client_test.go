@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/guldana/gophKeeperr/proto"
 )
@@ -44,11 +45,41 @@ func (f *fakeServer) CreateItem(_ context.Context, req *pb.CreateItemRequest) (*
 	return &pb.CreateItemResponse{Id: "new-item-id"}, nil
 }
 
+func (f *fakeServer) GetItem(_ context.Context, req *pb.GetItemRequest) (*pb.GetItemResponse, error) {
+	if req.Id == "not-found" {
+		return nil, status.Error(codes.NotFound, "элемент не найден")
+	}
+	return &pb.GetItemResponse{
+		Item: &pb.Item{
+			Id:            req.Id,
+			DataType:      pb.DataType_DATA_TYPE_TEXT,
+			EncryptedData: []byte("encrypted-data"),
+			Metadata:      map[string]string{"label": "test"},
+			CreatedAt:     timestamppb.Now(),
+			UpdatedAt:     timestamppb.Now(),
+		},
+	}, nil
+}
+
+func (f *fakeServer) UpdateItem(_ context.Context, req *pb.UpdateItemRequest) (*pb.UpdateItemResponse, error) {
+	if req.Item.Id == "not-found" {
+		return nil, status.Error(codes.NotFound, "элемент не найден")
+	}
+	return &pb.UpdateItemResponse{}, nil
+}
+
 func (f *fakeServer) DeleteItem(_ context.Context, req *pb.DeleteItemRequest) (*pb.DeleteItemResponse, error) {
 	if req.Id == "not-found" {
 		return nil, status.Error(codes.NotFound, "элемент не найден")
 	}
 	return &pb.DeleteItemResponse{}, nil
+}
+
+func (f *fakeServer) SyncItems(_ context.Context, req *pb.SyncRequest) (*pb.SyncResponse, error) {
+	return &pb.SyncResponse{
+		UpdatedItems: req.Items,
+		DeletedIds:   []string{},
+	}, nil
 }
 
 func startFakeServer(t *testing.T) string {
@@ -73,7 +104,7 @@ func startFakeServer(t *testing.T) string {
 
 func TestRegister(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -90,7 +121,7 @@ func TestRegister(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -107,7 +138,7 @@ func TestLogin(t *testing.T) {
 
 func TestLoginFail(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -121,7 +152,7 @@ func TestLoginFail(t *testing.T) {
 
 func TestListItems(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -139,7 +170,7 @@ func TestListItems(t *testing.T) {
 
 func TestCreateItem(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -158,9 +189,56 @@ func TestCreateItem(t *testing.T) {
 	}
 }
 
+func TestGetItem(t *testing.T) {
+	addr := startFakeServer(t)
+	client, err := New(addr, "")
+	if err != nil {
+		t.Fatalf("New() вернул ошибку: %v", err)
+	}
+	defer client.Close()
+	client.SetToken("fake-token")
+
+	item, err := client.GetItem(context.Background(), "item-1")
+	if err != nil {
+		t.Fatalf("GetItem() вернул ошибку: %v", err)
+	}
+	if item.Id != "item-1" {
+		t.Errorf("ожидался ID %q, получен %q", "item-1", item.Id)
+	}
+
+	_, err = client.GetItem(context.Background(), "not-found")
+	if err == nil {
+		t.Fatal("ожидалась ошибка при получении несуществующего элемента")
+	}
+}
+
+func TestUpdateItem(t *testing.T) {
+	addr := startFakeServer(t)
+	client, err := New(addr, "")
+	if err != nil {
+		t.Fatalf("New() вернул ошибку: %v", err)
+	}
+	defer client.Close()
+	client.SetToken("fake-token")
+
+	err = client.UpdateItem(context.Background(), &pb.Item{
+		Id:            "item-1",
+		DataType:      pb.DataType_DATA_TYPE_TEXT,
+		EncryptedData: []byte("updated"),
+	})
+	if err != nil {
+		t.Fatalf("UpdateItem() вернул ошибку: %v", err)
+	}
+
+	err = client.UpdateItem(context.Background(), &pb.Item{Id: "not-found"})
+	if err == nil {
+		t.Fatal("ожидалась ошибка при обновлении несуществующего элемента")
+	}
+}
+
 func TestDeleteItem(t *testing.T) {
 	addr := startFakeServer(t)
-	client, err := New(addr)
+	client, err := New(addr, "")
 	if err != nil {
 		t.Fatalf("New() вернул ошибку: %v", err)
 	}
@@ -173,5 +251,26 @@ func TestDeleteItem(t *testing.T) {
 
 	if err := client.DeleteItem(context.Background(), "not-found"); err == nil {
 		t.Fatal("ожидалась ошибка при удалении несуществующего элемента")
+	}
+}
+
+func TestSyncItems(t *testing.T) {
+	addr := startFakeServer(t)
+	client, err := New(addr, "")
+	if err != nil {
+		t.Fatalf("New() вернул ошибку: %v", err)
+	}
+	defer client.Close()
+	client.SetToken("fake-token")
+
+	items := []*pb.Item{
+		{Id: "item-1", DataType: pb.DataType_DATA_TYPE_TEXT, EncryptedData: []byte("data")},
+	}
+	resp, err := client.SyncItems(context.Background(), items, timestamppb.Now())
+	if err != nil {
+		t.Fatalf("SyncItems() вернул ошибку: %v", err)
+	}
+	if len(resp.UpdatedItems) != 1 {
+		t.Errorf("ожидался 1 обновлённый элемент, получено %d", len(resp.UpdatedItems))
 	}
 }

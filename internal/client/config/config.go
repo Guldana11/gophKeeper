@@ -13,8 +13,10 @@ const configFileName = ".gophkeeper.json"
 
 // Config хранит конфигурацию клиента.
 type Config struct {
-	Token      string `json:"token"`
-	ServerAddr string `json:"server_addr"`
+	Token         string `json:"token"`
+	ServerAddr    string `json:"server_addr"`
+	EncryptionKey string `json:"encryption_key"`
+	CACertPath    string `json:"ca_cert_path,omitempty"`
 }
 
 // configPath возвращает путь к файлу конфигурации в домашней директории.
